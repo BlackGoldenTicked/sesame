@@ -78,11 +78,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        applyAppIcon()
         configureMenu()
         configureStatusItem()
         model.reload()
         showLauncher()
         installHotCornerMonitor()
+    }
+
+    private func applyAppIcon() {
+        guard
+            let url = Bundle.module.url(forResource: "logo", withExtension: "png"),
+            let image = NSImage(contentsOf: url)
+        else {
+            return
+        }
+        NSApp.applicationIconImage = image
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

@@ -23,6 +23,18 @@ if [ -d "$BUILT_BUNDLE" ]; then
   cp -R "$BUILT_BUNDLE" "$RESOURCES_DIR/"
 fi
 
+LOGO_SRC="$ROOT_DIR/Sources/$APP_NAME/Resources/logo.png"
+if [ -f "$LOGO_SRC" ]; then
+  ICONSET_DIR="$(mktemp -d)/AppIcon.iconset"
+  mkdir -p "$ICONSET_DIR"
+  for size in 16 32 128 256 512; do
+    doubled=$((size * 2))
+    sips -z "$size" "$size" "$LOGO_SRC" --out "$ICONSET_DIR/icon_${size}x${size}.png" >/dev/null
+    sips -z "$doubled" "$doubled" "$LOGO_SRC" --out "$ICONSET_DIR/icon_${size}x${size}@2x.png" >/dev/null
+  done
+  iconutil -c icns "$ICONSET_DIR" -o "$RESOURCES_DIR/AppIcon.icns"
+fi
+
 cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -32,6 +44,10 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
   <string>en</string>
   <key>CFBundleExecutable</key>
   <string>$APP_NAME</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
+  <key>CFBundleIconName</key>
+  <string>AppIcon</string>
   <key>CFBundleIdentifier</key>
   <string>com.playground.textlaunch</string>
   <key>CFBundleInfoDictionaryVersion</key>
