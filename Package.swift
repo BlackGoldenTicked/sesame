@@ -13,7 +13,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "TextLaunch",
-            path: "Sources/TextLaunch"
+            path: "Sources/TextLaunch",
+            resources: [
+                .process("Resources")
+            ]
         )
     ]
 )
