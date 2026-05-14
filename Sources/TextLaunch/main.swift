@@ -401,10 +401,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func configureStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "TextLaunch"
-        item.button?.target = self
-        item.button?.action = #selector(showLauncherFromMenu)
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let button = item.button {
+            if
+                let iconURL = Bundle.module.url(forResource: "menubar", withExtension: "png"),
+                let image = NSImage(contentsOf: iconURL)
+            {
+                let target = NSSize(width: 18, height: 18)
+                let scaled = NSImage(size: target)
+                scaled.lockFocus()
+                NSGraphicsContext.current?.imageInterpolation = .high
+                image.draw(in: NSRect(origin: .zero, size: target))
+                scaled.unlockFocus()
+                scaled.isTemplate = true
+                button.image = scaled
+            } else {
+                button.title = "TextLaunch"
+            }
+            button.target = self
+            button.action = #selector(showLauncherFromMenu)
+        }
 
         let menu = NSMenu(title: "TextLaunch")
         let showItem = NSMenuItem(

@@ -10,6 +10,10 @@ struct LauncherView: View {
 
     @FocusState private var searchFieldFocused: Bool
 
+    private let tileColumns = [
+        GridItem(.adaptive(minimum: 96, maximum: 120), spacing: 18, alignment: .top)
+    ]
+
     init(
         model: LauncherModel,
         close: @escaping () -> Void,
@@ -25,85 +29,78 @@ struct LauncherView: View {
 
     var body: some View {
         ZStack {
-            VisualEffectBackground(material: .hudWindow, blendingMode: .behindWindow)
-                .ignoresSafeArea()
+            background
 
-            VStack(spacing: 14) {
+            VStack(spacing: 18) {
                 toolbar
 
                 if model.filteredApplications.isEmpty {
                     emptyState
                 } else {
-                    applicationList
+                    applicationGrid
                 }
             }
-            .padding(.horizontal, 28)
-            .padding(.top, 18)
-            .padding(.bottom, 18)
+            .padding(.horizontal, 40)
+            .padding(.top, 24)
+            .padding(.bottom, 24)
         }
         .onAppear { searchFieldFocused = true }
         .onChange(of: model.focusRequest) { _ in searchFieldFocused = true }
     }
 
+    private var background: some View {
+        ZStack {
+            VisualEffectBackground(material: .underWindowBackground, blendingMode: .behindWindow)
+            Color.black.opacity(0.55)
+        }
+        .ignoresSafeArea()
+    }
+
+    // MARK: - Toolbar
+
     private var toolbar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
+            Spacer(minLength: 0)
+
             searchField
 
-            Picker("", selection: $settings.sortMode) {
-                ForEach(SortMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
-                }
+            if !settings.customGroups.isEmpty {
+                modeToggle
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-
-            if settings.sortMode == .customGroups {
-                Button {
-                    openCustomGroupEditor(nil)
-                } label: {
-                    Image(systemName: "rectangle.stack.badge.plus")
-                }
-                .buttonStyle(.borderless)
-                .help("New Group")
-            }
-
-            Spacer()
-
-            Text("\(model.filteredApplications.count)")
-                .font(.system(.callout, design: .monospaced))
-                .foregroundStyle(.secondary)
 
             Button {
                 openSettings()
             } label: {
                 Image(systemName: "gearshape")
-            }
-            .buttonStyle(.borderless)
-            .help("Settings")
-
-            Button {
-                close()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .frame(width: 30, height: 30)
+                    .background(
+                        Circle().fill(Color.white.opacity(0.08))
+                    )
+                    .overlay(
+                        Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
+                    )
             }
             .buttonStyle(.plain)
-            .keyboardShortcut(.escape, modifiers: [])
-            .help("Close")
+            .help("Settings")
+
+            Spacer(minLength: 0)
         }
-        .font(.system(size: 16, weight: .regular))
     }
 
     private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.7))
 
-            TextField("Search", text: $model.searchText)
+            TextField("", text: $model.searchText, prompt: Text("Search").foregroundColor(.white.opacity(0.5)))
                 .textFieldStyle(.plain)
                 .focused($searchFieldFocused)
                 .onExitCommand { close() }
+                .foregroundStyle(.white)
+                .tint(.white)
                 .font(.system(size: 14))
 
             if !model.searchText.isEmpty {
@@ -111,41 +108,111 @@ struct LauncherView: View {
                     model.searchText = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.5))
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(.thickMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color.white.opacity(0.08))
         )
-        .frame(maxWidth: 360)
+        .overlay(
+            Capsule(style: .continuous)
+                .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5)
+        )
+        .frame(width: 280)
     }
 
-    private var applicationList: some View {
+    private var modeToggle: some View {
+        Button {
+            settings.sortMode = settings.sortMode == .alphabetical ? .customGroups : .alphabetical
+        } label: {
+            Image(systemName: settings.sortMode == .alphabetical ? "textformat.abc" : "rectangle.stack")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                .frame(width: 30, height: 30)
+                .background(
+                    Circle().fill(Color.white.opacity(0.08))
+                )
+                .overlay(
+                    Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(settings.sortMode == .alphabetical ? "Switch to Groups" : "Switch to Alphabetical")
+    }
+
+    // MARK: - Grid
+
+    private var applicationGrid: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14) {
+            LazyVStack(alignment: .leading, spacing: 26) {
                 ForEach(model.displayGroups) { group in
-                    GroupSectionView(
-                        group: group,
-                        settings: settings,
-                        onSelect: { app in
-                            close()
-                            model.open(app)
-                        },
-                        onEditGroup: { editable in
-                            openCustomGroupEditor(editable)
+                    VStack(alignment: .leading, spacing: 10) {
+                        if shouldShowHeader(for: group) {
+                            sectionHeader(for: group)
                         }
-                    )
+
+                        LazyVGrid(columns: tileColumns, alignment: .leading, spacing: 18) {
+                            ForEach(group.applications) { app in
+                                LaunchpadTile(application: app, font: tileFont) {
+                                    close()
+                                    model.open(app)
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            .padding(.vertical, 4)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
         }
         .scrollContentBackground(.hidden)
+    }
+
+    private func shouldShowHeader(for group: DisplayGroup) -> Bool {
+        if group.isLetterIndex {
+            // Only show letter headers when not searching, to reduce noise.
+            return model.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return true
+    }
+
+    private var tileFont: Font {
+        settings.appFont(weight: .medium)
+    }
+
+    private func sectionHeader(for group: DisplayGroup) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(group.title.uppercased())
+                .font(.system(.caption, design: group.isLetterIndex ? .monospaced : .default).weight(.semibold))
+                .foregroundStyle(.white.opacity(0.55))
+                .tracking(0.8)
+
+            if !group.isLetterIndex, let custom = customGroup(for: group) {
+                Button {
+                    openCustomGroupEditor(custom)
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+                .help("Edit Group")
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private func customGroup(for group: DisplayGroup) -> CustomGroup? {
+        guard !group.isLetterIndex else { return nil }
+        return settings.customGroups.first { "custom-\($0.id.uuidString)" == group.id }
     }
 
     private var emptyState: some View {
@@ -153,122 +220,57 @@ struct LauncherView: View {
             Spacer()
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 32, weight: .light))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.5))
             Text("No Matches")
                 .font(.title3)
-                .foregroundStyle(.primary)
+                .foregroundStyle(.white.opacity(0.85))
             Text("Try a shorter application name.")
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.55))
             Spacer()
         }
     }
 }
 
-private struct GroupSectionView: View {
-    let group: DisplayGroup
-    @ObservedObject var settings: AppSettings
-    let onSelect: (MacApplication) -> Void
-    let onEditGroup: (CustomGroup?) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(group.title.uppercased())
-                    .font(.system(.caption, design: group.isLetterIndex ? .monospaced : .default).weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .tracking(0.6)
-
-                Text("\(group.applications.count)")
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-
-                if !group.isLetterIndex, let custom = customGroup(for: group) {
-                    Spacer()
-                    Button {
-                        onEditGroup(custom)
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(.secondary)
-                    .help("Edit Group")
-                } else {
-                    Spacer()
-                }
-            }
-            .padding(.horizontal, 2)
-
-            FlowLayout(spacing: 6, lineSpacing: 6) {
-                ForEach(group.applications) { app in
-                    AppTextTile(
-                        title: app.name,
-                        font: settings.appFont(weight: .medium)
-                    ) {
-                        onSelect(app)
-                    }
-                }
-            }
-        }
-    }
-
-    private func customGroup(for group: DisplayGroup) -> CustomGroup? {
-        guard !group.isLetterIndex else { return nil }
-        return settings.customGroups.first { "custom-\($0.id.uuidString)" == group.id }
-    }
-}
-
-struct AppTextTile: View {
-    let title: String
+struct LaunchpadTile: View {
+    let application: MacApplication
     let font: Font
     let action: () -> Void
 
-    @State private var isHovering = false
+    @State private var hovering = false
+    @State private var pressing = false
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(font)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: true, vertical: false)
-                .frame(minHeight: 26)
-                .padding(.horizontal, 10)
-                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        }
-        .buttonStyle(AppTileButtonStyle(isHovering: isHovering))
-        .onHover { hovering in
-            isHovering = hovering
-        }
-    }
-}
+            VStack(spacing: 6) {
+                Image(nsImage: AppIconCache.shared.icon(for: application.url))
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 56, height: 56)
+                    .scaleEffect(pressing ? 0.92 : (hovering ? 1.04 : 1.0))
+                    .shadow(color: .black.opacity(hovering ? 0.35 : 0.0), radius: 8, y: 4)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.7), value: hovering)
+                    .animation(.spring(response: 0.18, dampingFraction: 0.6), value: pressing)
 
-private struct AppTileButtonStyle: ButtonStyle {
-    let isHovering: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(fill(for: configuration))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(Color(nsColor: .separatorColor).opacity(configuration.isPressed ? 0 : 0.35), lineWidth: 0.5)
-            )
-            .foregroundStyle(configuration.isPressed ? Color.white : .primary)
-            .animation(nil, value: configuration.isPressed)
-    }
-
-    private func fill(for configuration: Configuration) -> Color {
-        if configuration.isPressed {
-            return Color.accentColor
+                Text(application.name)
+                    .font(font)
+                    .foregroundStyle(.white.opacity(0.92))
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 96)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
         }
-        if isHovering {
-            return Color(nsColor: .controlAccentColor).opacity(0.12)
-        }
-        return Color(nsColor: .controlBackgroundColor).opacity(0.6)
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in pressing = true }
+                .onEnded { _ in pressing = false }
+        )
     }
 }
