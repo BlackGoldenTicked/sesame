@@ -164,8 +164,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.level = .screenSaver
         window.animationBehavior = .none
         window.isReleasedWhenClosed = false
-        window.isOpaque = true
-        window.backgroundColor = NSColor(red: 0.933, green: 0.945, blue: 0.933, alpha: 1.0)
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = false
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         window.onEscape = { [weak self] in
             self?.hideLauncher()

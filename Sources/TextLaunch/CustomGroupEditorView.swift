@@ -36,18 +36,19 @@ struct CustomGroupEditorView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            AppTheme.canvas.ignoresSafeArea()
+            Color(nsColor: .windowBackgroundColor).ignoresSafeArea()
 
-            VStack(spacing: 12) {
+            VStack(spacing: 0) {
                 header
+
+                Divider()
 
                 appsScroll
 
+                Divider()
+
                 collectionDock
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 14)
 
             ForEach(flying) { token in
                 FlyingView(token: token) {
@@ -78,24 +79,18 @@ struct CustomGroupEditorView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(initialGroup == nil ? "New Group" : "Edit Group")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(AppTheme.body)
-                Text("Tap apps to collect them into the dock")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(AppTheme.mutedStrong)
-            }
+        HStack(spacing: 10) {
+            TextField("Group name", text: $groupName)
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 260)
 
             Spacer()
 
-            TextField("Group name", text: $groupName)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 240)
+            Text("\(selectedPaths.count) selected")
+                .font(.system(.callout, design: .monospaced))
+                .foregroundStyle(.secondary)
 
-            Button("Cancel", action: onCancel)
-                .buttonStyle(SecondaryButtonStyle())
+            Button("Cancel", role: .cancel, action: onCancel)
                 .keyboardShortcut(.escape, modifiers: [])
 
             Button {
@@ -104,49 +99,34 @@ struct CustomGroupEditorView: View {
                 let id = initialGroup?.id ?? UUID()
                 onSave(CustomGroup(id: id, name: resolvedName, appPaths: selectedPaths))
             } label: {
-                Text("Save Group")
-                    .font(.system(size: 14, weight: .semibold))
-                    .padding(.horizontal, 14)
-                    .frame(height: 34)
-                    .foregroundStyle(AppTheme.onPrimary)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(AppTheme.primary)
-                    )
+                Text("Save")
             }
-            .buttonStyle(.plain)
+            .keyboardShortcut(.defaultAction)
+            .buttonStyle(.borderedProminent)
             .disabled(selectedPaths.isEmpty)
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(AppTheme.elevated, lineWidth: 1)
-        }
+        .background(.bar)
     }
 
     private var appsScroll: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            LazyVStack(alignment: .leading, spacing: 14) {
                 ForEach(letterGroups) { group in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text(group.title)
-                                .font(settings.sectionFont())
-                                .foregroundStyle(AppTheme.primary)
-                            Text("\(group.applications.count)")
-                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(AppTheme.mutedStrong)
-                            Spacer()
-                        }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(group.title.uppercased())
+                            .font(.system(.caption, design: .monospaced).weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .tracking(0.6)
+                            .padding(.horizontal, 2)
 
                         FlowLayout(spacing: 6, lineSpacing: 6) {
                             ForEach(group.applications) { app in
                                 let selected = selectedPaths.contains(app.url.path)
                                 EditorAppTile(
                                     title: app.name,
-                                    font: settings.appFont(weight: .semibold),
+                                    font: settings.appFont(weight: .medium),
                                     selected: selected
                                 ) {
                                     handleTap(app: app, selected: selected)
@@ -164,14 +144,9 @@ struct CustomGroupEditorView: View {
                     }
                 }
             }
-            .padding(12)
-            .background(AppTheme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(AppTheme.elevated, lineWidth: 1)
-            }
+            .padding(16)
         }
-        .frame(maxHeight: .infinity)
+        .scrollContentBackground(.hidden)
     }
 
     private var letterGroups: [DisplayGroup] {
@@ -200,22 +175,22 @@ struct CustomGroupEditorView: View {
     }
 
     private var collectionDock: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
             minerCharacter
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     if selectedPaths.isEmpty {
                         Text("Tap an app above to collect it")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(AppTheme.mutedStrong)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
                             .padding(.horizontal, 6)
                     } else {
                         ForEach(Array(selectedPaths.enumerated()), id: \.offset) { index, path in
                             if let app = model.applications.first(where: { $0.url.path == path }) {
                                 DockedAppChip(
                                     title: app.name,
-                                    font: settings.appFont(weight: .semibold),
+                                    font: settings.appFont(weight: .medium),
                                     canMoveLeft: index > 0,
                                     canMoveRight: index < selectedPaths.count - 1,
                                     onMoveLeft: { move(from: index, to: index - 1) },
@@ -229,14 +204,10 @@ struct CustomGroupEditorView: View {
                 .padding(.horizontal, 8)
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .frame(minHeight: 80)
-        .background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(AppTheme.accent.opacity(0.4), lineWidth: 1)
-        }
+        .frame(minHeight: 76)
+        .background(.bar)
         .background(
             GeometryReader { proxy in
                 Color.clear.preference(
@@ -248,25 +219,17 @@ struct CustomGroupEditorView: View {
     }
 
     private var minerCharacter: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 0) {
             Text("⛏️")
-                .font(.system(size: 24))
+                .font(.system(size: 22))
                 .rotationEffect(.degrees(minerBob ? -25 : 0), anchor: .bottomTrailing)
                 .animation(.spring(response: 0.4, dampingFraction: 0.5), value: minerBob)
             Text("👷")
-                .font(.system(size: 30))
-                .offset(y: minerBob ? -3 : 0)
+                .font(.system(size: 26))
+                .offset(y: minerBob ? -2 : 0)
                 .animation(.spring(response: 0.45, dampingFraction: 0.55), value: minerBob)
         }
-        .frame(width: 60, height: 70)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(AppTheme.surface)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(AppTheme.accent.opacity(0.6), lineWidth: 1)
-        }
+        .frame(width: 52, height: 56)
     }
 
     private func handleTap(app: MacApplication, selected: Bool) {
@@ -285,7 +248,7 @@ struct CustomGroupEditorView: View {
             return
         }
         let start = CGPoint(x: startRect.midX, y: startRect.midY)
-        let end = CGPoint(x: endRect.midX, y: endRect.midY - 8)
+        let end = CGPoint(x: endRect.midX, y: endRect.midY - 6)
         flying.append(
             FlyingToken(
                 name: app.name,
@@ -322,34 +285,47 @@ private struct EditorAppTile: View {
     let selected: Bool
     let action: () -> Void
 
+    @State private var hovering = false
+
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 if selected {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(AppTheme.accent)
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
                 }
                 Text(title)
                     .font(font)
-                    .foregroundStyle(selected ? AppTheme.accent : AppTheme.body)
+                    .foregroundStyle(selected ? Color.accentColor : .primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             .fixedSize(horizontal: true, vertical: false)
-            .frame(minHeight: 30)
+            .frame(minHeight: 26)
             .padding(.horizontal, 10)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(selected ? AppTheme.accent.opacity(0.12) : AppTheme.panel)
+                    .fill(fill)
             )
-            .overlay {
+            .overlay(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(selected ? AppTheme.accent.opacity(0.6) : AppTheme.elevated, lineWidth: 1)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .strokeBorder(borderColor, lineWidth: 0.5)
+            )
         }
         .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+    }
+
+    private var fill: Color {
+        if selected { return Color.accentColor.opacity(0.14) }
+        if hovering { return Color(nsColor: .controlAccentColor).opacity(0.1) }
+        return Color(nsColor: .controlBackgroundColor).opacity(0.6)
+    }
+
+    private var borderColor: Color {
+        if selected { return Color.accentColor.opacity(0.5) }
+        return Color(nsColor: .separatorColor).opacity(0.4)
     }
 }
 
@@ -366,43 +342,38 @@ private struct DockedAppChip: View {
         HStack(spacing: 4) {
             Button(action: onMoveLeft) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(canMoveLeft ? AppTheme.body : AppTheme.muted)
+                    .font(.caption2.weight(.semibold))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderless)
             .disabled(!canMoveLeft)
 
             Text(title)
                 .font(font)
-                .foregroundStyle(AppTheme.body)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
 
             Button(action: onMoveRight) {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(canMoveRight ? AppTheme.body : AppTheme.muted)
+                    .font(.caption2.weight(.semibold))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderless)
             .disabled(!canMoveRight)
 
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(AppTheme.mutedStrong)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.vertical, 5)
         .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(AppTheme.surface)
+            Capsule().fill(Color(nsColor: .controlBackgroundColor))
         )
-        .overlay {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .stroke(AppTheme.accent.opacity(0.45), lineWidth: 1)
-        }
+        .overlay(
+            Capsule().strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
     }
 }
 
@@ -414,28 +385,27 @@ private struct FlyingView: View {
 
     var body: some View {
         Text(token.name)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(AppTheme.accent)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Color.accentColor)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(AppTheme.surface)
+                    .fill(.regularMaterial)
             )
-            .overlay {
+            .overlay(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(AppTheme.accent, lineWidth: 1.4)
-            }
-            .shadow(color: AppTheme.accent.opacity(0.45), radius: atEnd ? 1 : 8)
+                    .strokeBorder(Color.accentColor.opacity(0.6), lineWidth: 1)
+            )
             .scaleEffect(atEnd ? 0.35 : 1.0)
             .opacity(atEnd ? 0.0 : 1.0)
             .position(atEnd ? token.end : token.start)
             .allowsHitTesting(false)
             .onAppear {
-                withAnimation(.easeIn(duration: 0.55)) {
+                withAnimation(.easeIn(duration: 0.5)) {
                     atEnd = true
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
                     onComplete()
                 }
             }

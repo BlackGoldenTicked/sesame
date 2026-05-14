@@ -2,33 +2,46 @@ import AppKit
 import SwiftUI
 
 enum AppTheme {
-    static let canvas = Color(hex: 0xEEF1EE)
-    static let panel = Color(hex: 0xF8F9F7)
-    static let surface = Color(hex: 0xFCFCF9)
-    static let elevated = Color(hex: 0xD9DED8)
-    static let primary = Color(hex: 0x4F5F68)
-    static let primaryActive = Color(hex: 0x3F4C54)
-    static let body = Color(hex: 0x273036)
-    static let muted = Color(hex: 0x7A8589)
-    static let mutedStrong = Color(hex: 0x5F6B70)
-    static let onPrimary = Color(hex: 0xF8F9F7)
-    static let accent = Color(hex: 0xC58A2E)
+    static let canvas = Color(nsColor: .windowBackgroundColor)
+    static let panel = Color(nsColor: .controlBackgroundColor)
+    static let surface = Color(nsColor: .controlBackgroundColor)
+    static let elevated = Color(nsColor: .separatorColor)
+    static let primary = Color.accentColor
+    static let primaryActive = Color.accentColor
+    static let body = Color(nsColor: .labelColor)
+    static let muted = Color(nsColor: .tertiaryLabelColor)
+    static let mutedStrong = Color(nsColor: .secondaryLabelColor)
+    static let onPrimary = Color.white
+    static let accent = Color.accentColor
 }
 
-extension Color {
-    init(hex: UInt32) {
-        let red = Double((hex >> 16) & 0xFF) / 255.0
-        let green = Double((hex >> 8) & 0xFF) / 255.0
-        let blue = Double(hex & 0xFF) / 255.0
-        self.init(red: red, green: green, blue: blue)
+struct VisualEffectBackground: NSViewRepresentable {
+    var material: NSVisualEffectView.Material
+    var blendingMode: NSVisualEffectView.BlendingMode
+    var isEmphasized: Bool
+
+    init(
+        material: NSVisualEffectView.Material = .hudWindow,
+        blendingMode: NSVisualEffectView.BlendingMode = .behindWindow,
+        isEmphasized: Bool = false
+    ) {
+        self.material = material
+        self.blendingMode = blendingMode
+        self.isEmphasized = isEmphasized
     }
-}
 
-extension NSColor {
-    convenience init(hex: UInt32) {
-        let red = CGFloat((hex >> 16) & 0xFF) / 255.0
-        let green = CGFloat((hex >> 8) & 0xFF) / 255.0
-        let blue = CGFloat(hex & 0xFF) / 255.0
-        self.init(red: red, green: green, blue: blue, alpha: 1)
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = blendingMode
+        view.state = .active
+        view.isEmphasized = isEmphasized
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.material = material
+        view.blendingMode = blendingMode
+        view.isEmphasized = isEmphasized
     }
 }
