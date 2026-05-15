@@ -82,6 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configureMenu()
         configureStatusItem()
         model.reload()
+        model.startWatching()
         showLauncher()
         installHotCornerMonitor()
     }
@@ -138,6 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         launcherWindow.setFrame(NSScreen.main?.frame ?? launcherWindow.frame, display: true)
         launcherWindow.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        model.reloadAsync()
         DispatchQueue.main.async { [model] in
             model.requestSearchFocus()
         }

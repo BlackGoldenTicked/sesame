@@ -14,14 +14,19 @@ struct ApplicationGroup: Identifiable {
 }
 
 enum ApplicationScanner {
-    static func scan() -> [MacApplication] {
+    static func applicationRoots() -> [URL] {
         let fileManager = FileManager.default
         let homeApplications = fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
-        let roots = [
+        return [
             URL(fileURLWithPath: "/Applications", isDirectory: true),
             URL(fileURLWithPath: "/System/Applications", isDirectory: true),
             homeApplications
-        ]
+        ].filter { fileManager.fileExists(atPath: $0.path) }
+    }
+
+    static func scan() -> [MacApplication] {
+        let fileManager = FileManager.default
+        let roots = applicationRoots()
 
         var seen = Set<URL>()
         var applications: [MacApplication] = []

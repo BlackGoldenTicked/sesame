@@ -17,4 +17,8 @@ final class AppIconCache {
         cache[key] = image
         return image
     }
+
+    func retain(paths keep: Set<String>) {
+        cache = cache.filter { keep.contains($0.key) }
+    }
 }

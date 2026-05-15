@@ -17,6 +17,10 @@ final class LauncherModel: ObservableObject {
     let settings: AppSettings
 
     private var cancellables: Set<AnyCancellable> = []
+    private let scanQueue = DispatchQueue(label: "textlaunch.scan", qos: .userInitiated)
+    private var watchSources: [DispatchSourceFileSystemObject] = []
+    private var watchedFileDescriptors: [Int32] = []
+    private var pendingReload: DispatchWorkItem?
 
     init(settings: AppSettings = AppSettings()) {
         self.settings = settings
@@ -25,6 +29,10 @@ final class LauncherModel: ObservableObject {
                 self?.objectWillChange.send()
             }
             .store(in: &cancellables)
+    }
+
+    deinit {
+        stopWatching()
     }
 
     var visibleApplications: [MacApplication] {
@@ -115,6 +123,65 @@ final class LauncherModel: ObservableObject {
 
     func reload() {
         applications = ApplicationScanner.scan()
+    }
+
+    func reloadAsync() {
+        scanQueue.async { [weak self] in
+            let scanned = ApplicationScanner.scan()
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if scanned != self.applications {
+                    AppIconCache.shared.retain(paths: Set(scanned.map { $0.url.path }))
+                    self.applications = scanned
+                }
+            }
+        }
+    }
+
+    func startWatching() {
+        stopWatching()
+
+        let roots = ApplicationScanner.applicationRoots()
+        for url in roots {
+            let fd = Darwin.open(url.path, O_EVTONLY)
+            guard fd >= 0 else { continue }
+            let source = DispatchSource.makeFileSystemObjectSource(
+                fileDescriptor: fd,
+                eventMask: [.write, .delete, .rename, .extend, .link],
+                queue: scanQueue
+            )
+            source.setEventHandler { [weak self] in
+                self?.scheduleDebouncedReload()
+            }
+            source.setCancelHandler {
+                Darwin.close(fd)
+            }
+            source.resume()
+            watchSources.append(source)
+            watchedFileDescriptors.append(fd)
+        }
+    }
+
+    func stopWatching() {
+        pendingReload?.cancel()
+        pendingReload = nil
+        for source in watchSources {
+            source.cancel()
+        }
+        watchSources.removeAll()
+        watchedFileDescriptors.removeAll()
+    }
+
+    private func scheduleDebouncedReload() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.pendingReload?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                self?.reloadAsync()
+            }
+            self.pendingReload = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: work)
+        }
     }
 
     func requestSearchFocus() {
