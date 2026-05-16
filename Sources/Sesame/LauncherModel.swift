@@ -27,7 +27,7 @@ final class LauncherModel: ObservableObject {
     let settings: AppSettings
 
     private var cancellables: Set<AnyCancellable> = []
-    private let scanQueue = DispatchQueue(label: "textlaunch.scan", qos: .userInitiated)
+    private let scanQueue = DispatchQueue(label: "sesame.scan", qos: .userInitiated)
     private var watchSources: [DispatchSourceFileSystemObject] = []
     private var watchedFileDescriptors: [Int32] = []
     private var pendingReload: DispatchWorkItem?

@@ -74,15 +74,46 @@ struct LauncherView: View {
     private var background: some View {
         ZStack {
             Color(red: 0.07, green: 0.07, blue: 0.085)
+
+            // Ambient color glows — subtle radial tints in three corners
+            let ambient = settings.colorTheme.ambientColors
+            RadialGradient(
+                colors: [
+                    (ambient.first ?? .blue).opacity(0.18),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.12, y: 0.18),
+                startRadius: 0,
+                endRadius: 700
+            )
+            RadialGradient(
+                colors: [
+                    (ambient.count > 1 ? ambient[1] : .pink).opacity(0.13),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.88, y: 0.82),
+                startRadius: 0,
+                endRadius: 700
+            )
+            RadialGradient(
+                colors: [
+                    (ambient.count > 2 ? ambient[2] : .purple).opacity(0.10),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.78, y: 0.12),
+                startRadius: 0,
+                endRadius: 600
+            )
+
             GridLinesOverlay(
                 cellSize: CGFloat(settings.gridCellSize),
                 color: Color.white.opacity(0.045),
                 lineWidth: 0.5
             )
             RadialGradient(
-                colors: [Color.clear, Color.black.opacity(0.35)],
+                colors: [Color.clear, Color.black.opacity(0.30)],
                 center: .center,
-                startRadius: 220,
+                startRadius: 260,
                 endRadius: 1200
             )
         }
@@ -97,44 +128,32 @@ struct LauncherView: View {
 
             searchField
 
-            if !settings.customGroups.isEmpty {
-                modeToggle
-            }
+            modeToggle
 
-            Button {
+            gradientPillButton(
+                icon: "gearshape.fill",
+                help: "Settings"
+            ) {
                 openSettings()
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .frame(width: 30, height: 30)
-                    .background(
-                        Circle().fill(Color.white.opacity(0.08))
-                    )
-                    .overlay(
-                        Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
-                    )
             }
-            .buttonStyle(.plain)
-            .help("Settings")
 
             Spacer(minLength: 0)
         }
     }
 
     private var searchField: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 9) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.7))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color(white: 0.35))
 
-            TextField("", text: $model.searchText, prompt: Text("Search").foregroundColor(.white.opacity(0.5)))
+            TextField("", text: $model.searchText, prompt: Text("Search").foregroundColor(Color(white: 0.5)))
                 .textFieldStyle(.plain)
                 .focused($searchFieldFocused)
                 .onExitCommand { close() }
-                .foregroundStyle(.white)
-                .tint(.white)
-                .font(.system(size: 14))
+                .foregroundStyle(Color(white: 0.12))
+                .tint(Color(white: 0.2))
+                .font(.system(size: 14, weight: .medium))
                 .disabled(model.hintMode)
 
             if !model.searchText.isEmpty {
@@ -143,42 +162,51 @@ struct LauncherView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(Color(white: 0.45))
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(
-            Capsule(style: .continuous)
-                .fill(Color.white.opacity(model.hintMode ? 0.04 : 0.08))
-        )
-        .overlay(
-            FlowingBorder(active: !model.hintMode)
-        )
-        .frame(width: 280)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(FrostedPillBackground(blobColors: settings.colorTheme.pillBlobColors))
+        .frame(width: 320)
         .opacity(model.hintMode ? 0.55 : 1)
         .animation(.easeInOut(duration: 0.18), value: model.hintMode)
     }
 
     private var modeToggle: some View {
-        Button {
+        gradientPillButton(
+            icon: settings.sortMode == .alphabetical ? "textformat" : "square.grid.2x2.fill",
+            help: settings.sortMode == .alphabetical ? "Switch to Groups" : "Switch to Alphabetical"
+        ) {
             settings.sortMode = settings.sortMode == .alphabetical ? .customGroups : .alphabetical
-        } label: {
-            Image(systemName: settings.sortMode == .alphabetical ? "textformat.abc" : "rectangle.stack")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.85))
-                .frame(width: 30, height: 30)
+        }
+    }
+
+    private func gradientPillButton(
+        icon: String,
+        help: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
+                .frame(width: 38, height: 30)
                 .background(
-                    Circle().fill(Color.white.opacity(0.08))
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(settings.colorTheme.toolbarGradient)
                 )
                 .overlay(
-                    Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.35), lineWidth: 0.6)
                 )
+                .shadow(color: .black.opacity(0.30), radius: 6, y: 3)
         }
         .buttonStyle(.plain)
-        .help(settings.sortMode == .alphabetical ? "Switch to Groups" : "Switch to Alphabetical")
+        .help(help)
     }
 
     // MARK: - Grid
@@ -398,34 +426,80 @@ private struct HintBadge: View {
     }
 }
 
-// MARK: - Animated Border
+// MARK: - Frosted Pill Background
 
-private struct FlowingBorder: View {
-    var active: Bool = true
+private struct FrostedPillBackground: View {
+    let blobColors: [Color]
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !active)) { context in
-            let time = context.date.timeIntervalSinceReferenceDate
-            let angle = Angle.degrees(time.truncatingRemainder(dividingBy: 3.0) / 3.0 * 360.0)
+        Capsule(style: .continuous)
+            .fill(.white)
+            .overlay(
+                Capsule(style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.95),
+                                Color(white: 0.86).opacity(0.95)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            )
+            .overlay(colorBlobs.clipShape(Capsule(style: .continuous)))
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.95),
+                                Color.white.opacity(0.1)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
+            .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+    }
 
-            Capsule(style: .continuous)
-                .strokeBorder(
-                    AngularGradient(
-                        gradient: Gradient(colors: [
-                            Color(red: 0.30, green: 0.85, blue: 1.00),
-                            Color(red: 0.60, green: 0.40, blue: 1.00),
-                            Color(red: 1.00, green: 0.35, blue: 0.78),
-                            Color(red: 0.25, green: 0.95, blue: 0.78),
-                            Color(red: 0.30, green: 0.85, blue: 1.00)
-                        ]),
-                        center: .center,
-                        angle: angle
-                    ),
-                    lineWidth: active ? 1.4 : 0.6
-                )
-                .opacity(active ? 1.0 : 0.35)
+    private var colorBlobs: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            ZStack {
+                Circle()
+                    .fill(blobColors[safe: 0] ?? Color.blue)
+                    .frame(width: w * 0.55, height: w * 0.55)
+                    .position(x: w * 0.78, y: -h * 0.05)
+                    .blur(radius: 26)
+                    .opacity(0.85)
+
+                Circle()
+                    .fill(blobColors[safe: 1] ?? Color.pink)
+                    .frame(width: w * 0.45, height: w * 0.45)
+                    .position(x: w * 0.55, y: h * 1.15)
+                    .blur(radius: 30)
+                    .opacity(0.75)
+
+                Circle()
+                    .fill(blobColors[safe: 2] ?? Color.purple)
+                    .frame(width: w * 0.30, height: w * 0.30)
+                    .position(x: w * 0.30, y: h * 0.85)
+                    .blur(radius: 28)
+                    .opacity(0.55)
+            }
         }
         .allowsHitTesting(false)
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 

@@ -10,18 +10,13 @@ enum HotCorner: String, CaseIterable {
 
     static let defaultsKey = "HotCorner"
 
-    var title: String {
+    var localizationKey: L {
         switch self {
-        case .off:
-            return "Off"
-        case .topLeft:
-            return "Top Left"
-        case .topRight:
-            return "Top Right"
-        case .bottomLeft:
-            return "Bottom Left"
-        case .bottomRight:
-            return "Bottom Right"
+        case .off: return .cornerOff
+        case .topLeft: return .cornerTopLeft
+        case .topRight: return .cornerTopRight
+        case .bottomLeft: return .cornerBottomLeft
+        case .bottomRight: return .cornerBottomRight
         }
     }
 
@@ -83,16 +78,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotCornerEnteredAt: Date?
     private var hotCornerIsArmed = true
     private var launcherSuspended = false
+    private var languageObservation: NSObjectProtocol?
+    private var lastLanguage: AppLanguage = .english
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         applyAppIcon()
+        lastLanguage = settings.language
         configureMenu()
         configureStatusItem()
+        observeLanguageChange()
         model.reload()
         model.startWatching()
         showLauncher()
         installHotCornerMonitor()
+    }
+
+    private func observeLanguageChange() {
+        languageObservation = NotificationCenter.default.addObserver(
+            forName: AppSettings.languageDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self, self.lastLanguage != self.settings.language else { return }
+            self.lastLanguage = self.settings.language
+            self.rebuildMenus()
+        }
+    }
+
+    private func rebuildMenus() {
+        configureMenu()
+        if let item = statusItem {
+            item.menu = makeStatusMenu()
+        }
     }
 
     private func applyAppIcon() {
@@ -184,7 +202,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             defer: false
         )
 
-        window.title = "TextLaunch"
+        window.title = "Sesame"
         window.level = .screenSaver
         window.animationBehavior = .none
         window.isReleasedWhenClosed = false
@@ -421,12 +439,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func configureMenu() {
+        hotCornerMenuItems.removeAll()
+
         let mainMenu = NSMenu()
         let appMenuItem = NSMenuItem()
-        let appMenu = NSMenu(title: "TextLaunch")
+        let appMenu = NSMenu(title: settings.t(.appName))
 
         let showItem = NSMenuItem(
-            title: "Show TextLaunch",
+            title: settings.t(.menuShowApp),
             action: #selector(showLauncherFromMenu),
             keyEquivalent: "l"
         )
@@ -434,7 +454,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(showItem)
 
         let reloadItem = NSMenuItem(
-            title: "Reload Applications",
+            title: settings.t(.menuReload),
             action: #selector(reloadApplications),
             keyEquivalent: "r"
         )
@@ -442,7 +462,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(reloadItem)
 
         let settingsItem = NSMenuItem(
-            title: "Settings…",
+            title: settings.t(.menuSettings),
             action: #selector(openSettingsFromMenu),
             keyEquivalent: ","
         )
@@ -453,7 +473,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(.separator())
         appMenu.addItem(
             NSMenuItem(
-                title: "Quit TextLaunch",
+                title: settings.t(.menuQuit),
                 action: #selector(NSApplication.terminate(_:)),
                 keyEquivalent: "q"
             )
@@ -480,15 +500,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 scaled.isTemplate = true
                 button.image = scaled
             } else {
-                button.title = "TextLaunch"
+                button.title = settings.t(.appName)
             }
             button.target = self
             button.action = #selector(showLauncherFromMenu)
         }
+        item.menu = makeStatusMenu()
+        statusItem = item
+    }
 
-        let menu = NSMenu(title: "TextLaunch")
+    private func makeStatusMenu() -> NSMenu {
+        let menu = NSMenu(title: settings.t(.appName))
+
         let showItem = NSMenuItem(
-            title: "Show Applications",
+            title: settings.t(.menuShowApplications),
             action: #selector(showLauncherFromMenu),
             keyEquivalent: ""
         )
@@ -496,7 +521,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(showItem)
 
         let reloadItem = NSMenuItem(
-            title: "Reload Applications",
+            title: settings.t(.menuReload),
             action: #selector(reloadApplications),
             keyEquivalent: ""
         )
@@ -504,7 +529,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(reloadItem)
 
         let settingsItem = NSMenuItem(
-            title: "Settings…",
+            title: settings.t(.menuSettings),
             action: #selector(openSettingsFromMenu),
             keyEquivalent: ""
         )
@@ -515,19 +540,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         menu.addItem(
             NSMenuItem(
-                title: "Quit TextLaunch",
+                title: settings.t(.menuQuit),
                 action: #selector(NSApplication.terminate(_:)),
                 keyEquivalent: ""
             )
         )
-
-        item.menu = menu
-        statusItem = item
+        return menu
     }
 
     private func makeHotCornerMenuItem() -> NSMenuItem {
-        let parentItem = NSMenuItem(title: "Trigger Corner", action: nil, keyEquivalent: "")
-        let submenu = NSMenu(title: "Trigger Corner")
+        let parentTitle = settings.t(.menuTriggerCorner)
+        let parentItem = NSMenuItem(title: parentTitle, action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: parentTitle)
 
         for corner in HotCorner.allCases {
             if corner == .off {
@@ -535,7 +559,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             let item = NSMenuItem(
-                title: corner.title,
+                title: settings.t(corner.localizationKey),
                 action: #selector(setHotCorner(_:)),
                 keyEquivalent: ""
             )

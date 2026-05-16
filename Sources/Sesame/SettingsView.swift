@@ -262,6 +262,14 @@ private struct GeneralPage: View {
             }
 
             SectionGroup(title: settings.t(.appearance)) {
+                SettingRow(label: settings.t(.theme), trailingAlignment: .center) {
+                    HStack(spacing: 8) {
+                        ForEach(ColorTheme.allCases) { theme in
+                            themeSwatch(theme)
+                        }
+                    }
+                }
+                RowDivider()
                 SettingRow(label: settings.t(.font)) {
                     Picker("", selection: $settings.fontName) {
                         Text(settings.t(.systemDefault)).tag(AppSettings.systemFontName)
@@ -307,6 +315,33 @@ private struct GeneralPage: View {
                 }
             }
         }
+    }
+
+    private func themeSwatch(_ theme: ColorTheme) -> some View {
+        let active = settings.colorTheme == theme
+        return Button {
+            settings.colorTheme = theme
+        } label: {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: theme.toolbarGradientColors,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 46, height: 30)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .strokeBorder(
+                            active ? Color.accentColor : Color.primary.opacity(0.12),
+                            lineWidth: active ? 2 : 1
+                        )
+                )
+                .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
+        }
+        .buttonStyle(.plain)
+        .help(theme.localizationKey.string(settings.language))
     }
 
     private func languageButton(_ language: AppLanguage, label: String) -> some View {

@@ -141,7 +141,16 @@ final class AppSettings: ObservableObject {
     @Published var hiddenAppPaths: Set<String> = [] { didSet { save() } }
     @Published var sortMode: SortMode = .alphabetical { didSet { save() } }
     @Published var customGroups: [CustomGroup] = [] { didSet { save() } }
-    @Published var language: AppLanguage = AppSettings.systemPreferredLanguage() { didSet { save() } }
+    @Published var language: AppLanguage = AppSettings.systemPreferredLanguage() {
+        didSet {
+            save()
+            if oldValue != language {
+                NotificationCenter.default.post(name: AppSettings.languageDidChange, object: self)
+            }
+        }
+    }
+
+    static let languageDidChange = Notification.Name("AppSettings.languageDidChange")
     @Published var launchAtLogin: Bool = false {
         didSet {
             if oldValue != launchAtLogin {
@@ -152,9 +161,10 @@ final class AppSettings: ObservableObject {
     }
     @Published var hintHotkey: Hotkey = .default { didSet { save() } }
     @Published var gridCellSize: Double = 114 { didSet { save() } }
+    @Published var colorTheme: ColorTheme = .sunset { didSet { save() } }
 
-    private static let defaultsKey = "TextLaunchSettings.v2"
-    private static let legacyDefaultsKey = "TextLaunchSettings.v1"
+    private static let defaultsKey = "SesameSettings.v2"
+    private static let legacyDefaultsKey = "SesameSettings.v1"
     private var suppressSave = false
 
     init() {
@@ -173,6 +183,7 @@ final class AppSettings: ObservableObject {
         var language: AppLanguage
         var hintHotkey: Hotkey
         var gridCellSize: Double
+        var colorTheme: ColorTheme?
     }
 
     private struct LegacyPersisted: Codable {
@@ -199,6 +210,7 @@ final class AppSettings: ObservableObject {
             language = parsed.language
             hintHotkey = parsed.hintHotkey
             gridCellSize = parsed.gridCellSize
+            colorTheme = parsed.colorTheme ?? .sunset
             suppressSave = false
             return
         }
@@ -236,7 +248,8 @@ final class AppSettings: ObservableObject {
             customGroups: customGroups,
             language: language,
             hintHotkey: hintHotkey,
-            gridCellSize: gridCellSize
+            gridCellSize: gridCellSize,
+            colorTheme: colorTheme
         )
 
         if let data = try? JSONEncoder().encode(persisted) {

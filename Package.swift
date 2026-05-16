@@ -3,17 +3,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "TextLaunch",
+    name: "Sesame",
     platforms: [
         .macOS(.v13)
     ],
     products: [
-        .executable(name: "TextLaunch", targets: ["TextLaunch"])
+        .executable(name: "Sesame", targets: ["Sesame"])
     ],
     targets: [
         .executableTarget(
-            name: "TextLaunch",
-            path: "Sources/TextLaunch",
+            name: "Sesame",
+            path: "Sources/Sesame",
             resources: [
                 .process("Resources")
             ]

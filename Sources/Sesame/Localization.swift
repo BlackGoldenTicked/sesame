@@ -21,6 +21,7 @@ enum L {
     case language
     case hotkeySection, hotkey, hotkeyHint, recording, pressKey, clear
     case appearance
+    case theme, themeSunset, themeAurora, themePeach, themeOcean, themeMono
     case textSize, small, medium, large
     case gridDensity, cellSize, compact, loose
     case hiddenApps, hiddenCount, filter, manageHiddenApps
@@ -28,6 +29,8 @@ enum L {
     case appName, tagline, version, versionNumber, copyrightLine1, copyrightLine2, website, visitWebsite, sendFeedback, acknowledgements
     case copyright
     case font, fontFamily, systemDefault, preview, applicationFont, fontFootnote
+    case menuShowApp, menuShowApplications, menuReload, menuSettings, menuQuit
+    case menuTriggerCorner, cornerOff, cornerTopLeft, cornerTopRight, cornerBottomLeft, cornerBottomRight
 
     func string(_ lang: AppLanguage) -> String {
         switch lang {
@@ -37,17 +40,17 @@ enum L {
     }
 
     private static let english: [L: String] = [
-        .settings: "TextLaunch Settings",
+        .settings: "Sesame Settings",
         .general: "General",
         .hidden: "Hidden",
         .groupsTab: "Groups",
         .about: "About",
-        .generalSubtitle: "Configure TextLaunch's behavior and appearance.",
+        .generalSubtitle: "Configure Sesame's behavior and appearance.",
         .hiddenSubtitle: "Choose which apps appear in the launcher.",
         .groupsSubtitle: "Organize apps into named groups.",
-        .aboutSubtitle: "About TextLaunch",
+        .aboutSubtitle: "About Sesame",
         .startup: "Startup",
-        .launchAtLogin: "Launch TextLaunch at login",
+        .launchAtLogin: "Launch Sesame at login",
         .language: "Language",
         .hotkeySection: "Hotkey",
         .hotkey: "Open Hint Mode",
@@ -56,6 +59,12 @@ enum L {
         .pressKey: "Press a key combination",
         .clear: "Reset",
         .appearance: "Appearance",
+        .theme: "Theme",
+        .themeSunset: "Sunset",
+        .themeAurora: "Aurora",
+        .themePeach: "Peach",
+        .themeOcean: "Ocean",
+        .themeMono: "Mono",
         .textSize: "Text Size",
         .small: "S",
         .medium: "M",
@@ -76,10 +85,10 @@ enum L {
         .ungrouped: "Ungrouped",
         .noGroups: "No custom groups yet.",
         .createGroupHint: "Create a group to organize your apps.",
-        .appName: "TextLaunch",
-        .tagline: "A keyboard-first launcher for macOS.",
+        .appName: "Sesame",
+        .tagline: "Tiny grains. Open everything.",
         .version: "Version",
-        .versionNumber: "0.0.1",
+        .versionNumber: "1.0.0",
         .copyrightLine1: "© Chaordex Technologies Ltd.",
         .copyrightLine2: "2024–2026. All rights reserved.",
         .copyright: "© Chaordex Technologies Ltd. 2024–2026. All rights reserved.",
@@ -92,21 +101,32 @@ enum L {
         .systemDefault: "System Default",
         .preview: "Preview",
         .applicationFont: "Application Font",
-        .fontFootnote: "Affects the app buttons in the launcher and group editor."
+        .fontFootnote: "Affects the app buttons in the launcher and group editor.",
+        .menuShowApp: "Show Sesame",
+        .menuShowApplications: "Show Applications",
+        .menuReload: "Reload Applications",
+        .menuSettings: "Settings…",
+        .menuQuit: "Quit Sesame",
+        .menuTriggerCorner: "Trigger Corner",
+        .cornerOff: "Off",
+        .cornerTopLeft: "Top Left",
+        .cornerTopRight: "Top Right",
+        .cornerBottomLeft: "Bottom Left",
+        .cornerBottomRight: "Bottom Right"
     ]
 
     private static let chinese: [L: String] = [
-        .settings: "TextLaunch 设置",
+        .settings: "Sesame 设置",
         .general: "通用",
         .hidden: "隐藏",
         .groupsTab: "分组",
         .about: "关于",
-        .generalSubtitle: "配置 TextLaunch 的基本行为与外观。",
+        .generalSubtitle: "配置 Sesame 的基本行为与外观。",
         .hiddenSubtitle: "选择启动器中显示的应用。",
         .groupsSubtitle: "把应用归类到命名分组中。",
-        .aboutSubtitle: "关于 TextLaunch",
+        .aboutSubtitle: "关于 Sesame",
         .startup: "启动",
-        .launchAtLogin: "登录时启动 TextLaunch",
+        .launchAtLogin: "登录时启动 Sesame",
         .language: "语言",
         .hotkeySection: "快捷键",
         .hotkey: "打开 Hint 模式",
@@ -115,6 +135,12 @@ enum L {
         .pressKey: "按下一个快捷键",
         .clear: "重置",
         .appearance: "外观",
+        .theme: "主题配色",
+        .themeSunset: "日落",
+        .themeAurora: "极光",
+        .themePeach: "蜜桃",
+        .themeOcean: "海洋",
+        .themeMono: "极简",
         .textSize: "文字大小",
         .small: "小",
         .medium: "中",
@@ -135,10 +161,10 @@ enum L {
         .ungrouped: "未分组",
         .noGroups: "还没有自定义分组。",
         .createGroupHint: "创建一个分组来管理你的应用。",
-        .appName: "TextLaunch",
-        .tagline: "为 macOS 打造的键盘优先启动器。",
+        .appName: "Sesame",
+        .tagline: "颗粒虽小，处处可入。",
         .version: "版本",
-        .versionNumber: "0.0.1",
+        .versionNumber: "1.0.0",
         .copyrightLine1: "© Chaordex Technologies Ltd.",
         .copyrightLine2: "2024–2026 版权所有。",
         .copyright: "© Chaordex Technologies Ltd. 2024–2026 版权所有。",
@@ -151,6 +177,17 @@ enum L {
         .systemDefault: "系统默认",
         .preview: "预览",
         .applicationFont: "应用字体",
-        .fontFootnote: "影响启动器与分组编辑器中的应用按钮。"
+        .fontFootnote: "影响启动器与分组编辑器中的应用按钮。",
+        .menuShowApp: "显示 Sesame",
+        .menuShowApplications: "显示应用",
+        .menuReload: "重新扫描应用",
+        .menuSettings: "设置…",
+        .menuQuit: "退出 Sesame",
+        .menuTriggerCorner: "触发热区",
+        .cornerOff: "关闭",
+        .cornerTopLeft: "左上角",
+        .cornerTopRight: "右上角",
+        .cornerBottomLeft: "左下角",
+        .cornerBottomRight: "右下角"
     ]
 }

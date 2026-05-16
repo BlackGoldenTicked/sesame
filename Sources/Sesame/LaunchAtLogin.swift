@@ -20,7 +20,7 @@ enum LaunchAtLoginManager {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            NSLog("TextLaunch: failed to update login item — \(error)")
+            NSLog("Sesame: failed to update login item — \(error)")
         }
     }
 }
