@@ -43,6 +43,7 @@ enum HotCorner: String, CaseIterable {
 
 final class LauncherWindow: NSWindow {
     var onEscape: (() -> Void)?
+    var keyInterceptor: ((NSEvent) -> Bool)?
 
     override var canBecomeKey: Bool {
         true
@@ -50,6 +51,13 @@ final class LauncherWindow: NSWindow {
 
     override var canBecomeMain: Bool {
         true
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown, keyInterceptor?(event) == true {
+            return
+        }
+        super.sendEvent(event)
     }
 
     override func keyDown(with event: NSEvent) {
@@ -133,6 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showLauncher() {
+        let isNewWindow = window == nil
         let launcherWindow = window ?? makeWindow()
         window = launcherWindow
 
@@ -140,8 +149,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         launcherWindow.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         model.reloadAsync()
-        DispatchQueue.main.async { [model] in
-            model.requestSearchFocus()
+        if !isNewWindow {
+            DispatchQueue.main.async { [model] in
+                model.requestSearchFocus()
+            }
         }
     }
 
@@ -177,8 +188,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.level = .screenSaver
         window.animationBehavior = .none
         window.isReleasedWhenClosed = false
-        window.isOpaque = false
-        window.backgroundColor = .clear
+        window.isOpaque = true
+        window.backgroundColor = NSColor(red: 0.07, green: 0.07, blue: 0.085, alpha: 1)
         window.hasShadow = false
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         window.onEscape = { [weak self] in
@@ -199,8 +210,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         window.contentView = NSHostingView(rootView: root)
+        window.keyInterceptor = { [weak self] event in
+            self?.handleLauncherKey(event) ?? false
+        }
 
         return window
+    }
+
+    private func handleLauncherKey(_ event: NSEvent) -> Bool {
+        let flags = event.modifierFlags
+        let chars = event.charactersIgnoringModifiers ?? ""
+        let lower = chars.lowercased()
+        let plain = !flags.contains(.command)
+            && !flags.contains(.option)
+            && !flags.contains(.control)
+
+        // Ctrl+A → select all in the focused text field
+        if flags.contains(.control), lower == "a", !model.hintMode {
+            NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+            return true
+        }
+
+        if model.hintMode {
+            // Esc exits hint mode
+            if event.keyCode == 53 {
+                model.exitHintMode()
+                return true
+            }
+            // Plain letter input goes to hint matcher
+            if plain, let scalar = lower.unicodeScalars.first,
+               CharacterSet.lowercaseLetters.contains(scalar) {
+                let result = model.handleHintInput(Character(scalar))
+                if case let .launched(app) = result {
+                    hideLauncher()
+                    model.open(app)
+                }
+                return true
+            }
+            // Swallow other unmodified keystrokes so they don't leak to the field
+            return plain
+        }
+
+        // Enter hint mode via configured hotkey
+        if settings.hintHotkey.matches(event) {
+            model.enterHintMode()
+            return true
+        }
+
+        return false
     }
 
     private func openSettings() {
@@ -224,10 +281,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         let host = NSHostingController(rootView: view)
+        if #available(macOS 13.0, *) {
+            host.sizingOptions = [.preferredContentSize]
+        }
         let window = NSWindow(contentViewController: host)
-        window.title = "TextLaunch Settings"
-        window.styleMask = [.titled, .closable, .resizable]
-        window.setContentSize(NSSize(width: 680, height: 520))
+        window.title = settings.t(.settings)
+        window.styleMask = [.titled, .closable, .fullSizeContentView]
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = true
         window.center()
         window.isReleasedWhenClosed = false
         window.delegate = SettingsWindowDelegate.shared

@@ -10,9 +10,14 @@ struct LauncherView: View {
 
     @FocusState private var searchFieldFocused: Bool
 
-    private let tileColumns = [
-        GridItem(.adaptive(minimum: 96, maximum: 120), spacing: 18, alignment: .top)
-    ]
+    private var metrics: TileMetrics { settings.tileMetrics }
+
+    private var tileColumns: [GridItem] {
+        let m = metrics
+        return [
+            GridItem(.adaptive(minimum: m.tileWidth, maximum: m.tileWidth + 16), spacing: m.spacing, alignment: .top)
+        ]
+    }
 
     init(
         model: LauncherModel,
@@ -43,15 +48,43 @@ struct LauncherView: View {
             .padding(.horizontal, 40)
             .padding(.top, 24)
             .padding(.bottom, 24)
+
+            if model.hintMode {
+                hintHud
+                    .transition(.opacity)
+            }
         }
-        .onAppear { searchFieldFocused = true }
-        .onChange(of: model.focusRequest) { _ in searchFieldFocused = true }
+        .onAppear {
+            searchFieldFocused = true
+        }
+        .onChange(of: model.focusRequest) { _ in
+            if !model.hintMode && !searchFieldFocused {
+                searchFieldFocused = true
+            }
+        }
+        .onChange(of: model.hintMode) { isOn in
+            if isOn {
+                searchFieldFocused = false
+            } else {
+                searchFieldFocused = true
+            }
+        }
     }
 
     private var background: some View {
         ZStack {
-            VisualEffectBackground(material: .underWindowBackground, blendingMode: .behindWindow)
-            Color.black.opacity(0.55)
+            Color(red: 0.07, green: 0.07, blue: 0.085)
+            GridLinesOverlay(
+                cellSize: CGFloat(settings.gridCellSize),
+                color: Color.white.opacity(0.045),
+                lineWidth: 0.5
+            )
+            RadialGradient(
+                colors: [Color.clear, Color.black.opacity(0.35)],
+                center: .center,
+                startRadius: 220,
+                endRadius: 1200
+            )
         }
         .ignoresSafeArea()
     }
@@ -102,6 +135,7 @@ struct LauncherView: View {
                 .foregroundStyle(.white)
                 .tint(.white)
                 .font(.system(size: 14))
+                .disabled(model.hintMode)
 
             if !model.searchText.isEmpty {
                 Button {
@@ -118,13 +152,14 @@ struct LauncherView: View {
         .padding(.vertical, 6)
         .background(
             Capsule(style: .continuous)
-                .fill(Color.white.opacity(0.08))
+                .fill(Color.white.opacity(model.hintMode ? 0.04 : 0.08))
         )
         .overlay(
-            Capsule(style: .continuous)
-                .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5)
+            FlowingBorder(active: !model.hintMode)
         )
         .frame(width: 280)
+        .opacity(model.hintMode ? 0.55 : 1)
+        .animation(.easeInOut(duration: 0.18), value: model.hintMode)
     }
 
     private var modeToggle: some View {
@@ -149,7 +184,7 @@ struct LauncherView: View {
     // MARK: - Grid
 
     private var applicationGrid: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(alignment: .leading, spacing: 26) {
                 ForEach(model.displayGroups) { group in
                     VStack(alignment: .leading, spacing: 10) {
@@ -157,9 +192,15 @@ struct LauncherView: View {
                             sectionHeader(for: group)
                         }
 
-                        LazyVGrid(columns: tileColumns, alignment: .leading, spacing: 18) {
+                        LazyVGrid(columns: tileColumns, alignment: .leading, spacing: metrics.rowSpacing) {
                             ForEach(group.applications) { app in
-                                LaunchpadTile(application: app, font: tileFont) {
+                                LaunchpadTile(
+                                    application: app,
+                                    font: tileFont,
+                                    metrics: metrics,
+                                    hintCode: model.hintMode ? model.hintCodes[app.url.path] : nil,
+                                    hintMatchedPrefix: model.hintMode ? model.hintBuffer : ""
+                                ) {
                                     close()
                                     model.open(app)
                                 }
@@ -176,7 +217,6 @@ struct LauncherView: View {
 
     private func shouldShowHeader(for group: DisplayGroup) -> Bool {
         if group.isLetterIndex {
-            // Only show letter headers when not searching, to reduce noise.
             return model.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
         return true
@@ -230,11 +270,39 @@ struct LauncherView: View {
             Spacer()
         }
     }
+
+    private var hintHud: some View {
+        VStack {
+            Spacer()
+            HStack(spacing: 8) {
+                Image(systemName: "keyboard")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(model.hintBuffer.isEmpty ? "Hint mode · \(settings.hintHotkey.displayString) · type letters · Esc to exit" : "Typed: \(model.hintBuffer.uppercased())")
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+            }
+            .foregroundStyle(.white.opacity(0.9))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                Capsule().fill(Color.black.opacity(0.55))
+            )
+            .overlay(
+                Capsule().strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5)
+            )
+            .padding(.bottom, 18)
+        }
+    }
+
 }
+
+// MARK: - Tile
 
 struct LaunchpadTile: View {
     let application: MacApplication
     let font: Font
+    let metrics: TileMetrics
+    var hintCode: String? = nil
+    var hintMatchedPrefix: String = ""
     let action: () -> Void
 
     @State private var hovering = false
@@ -242,16 +310,23 @@ struct LaunchpadTile: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: metrics.textVerticalSpacing) {
                 Image(nsImage: AppIconCache.shared.icon(for: application.url))
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 56, height: 56)
+                    .frame(width: metrics.iconSize, height: metrics.iconSize)
                     .scaleEffect(pressing ? 0.92 : (hovering ? 1.04 : 1.0))
                     .shadow(color: .black.opacity(hovering ? 0.35 : 0.0), radius: 8, y: 4)
                     .animation(.spring(response: 0.25, dampingFraction: 0.7), value: hovering)
                     .animation(.spring(response: 0.18, dampingFraction: 0.6), value: pressing)
+                    .overlay(alignment: .topTrailing) {
+                        if let code = hintCode {
+                            HintBadge(code: code, matchedPrefix: hintMatchedPrefix)
+                                .offset(x: 6, y: -6)
+                                .transition(.scale.combined(with: .opacity))
+                        }
+                    }
 
                 Text(application.name)
                     .font(font)
@@ -259,10 +334,11 @@ struct LaunchpadTile: View {
                     .lineLimit(2)
                     .truncationMode(.tail)
                     .multilineTextAlignment(.center)
-                    .frame(width: 96)
+                    .frame(width: metrics.textWidth)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.vertical, 6)
+            .frame(width: metrics.tileWidth)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -272,5 +348,116 @@ struct LaunchpadTile: View {
                 .onChanged { _ in pressing = true }
                 .onEnded { _ in pressing = false }
         )
+    }
+}
+
+// MARK: - Hint Badge
+
+private struct HintBadge: View {
+    let code: String
+    let matchedPrefix: String
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(code.enumerated()), id: \.offset) { _, char in
+                Text(String(char).uppercased())
+                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                    .foregroundStyle(isMatched(char) ? Color.black : Color.white)
+            }
+        }
+        .padding(.horizontal, 5)
+        .padding(.vertical, 2)
+        .background(
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(backgroundFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.25), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.5), radius: 4, y: 1)
+    }
+
+    private var backgroundFill: LinearGradient {
+        LinearGradient(
+            colors: [Color(red: 1.0, green: 0.92, blue: 0.35), Color(red: 1.0, green: 0.75, blue: 0.2)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    private func isMatched(_ char: Character) -> Bool {
+        guard !matchedPrefix.isEmpty else { return false }
+        let codeLower = code.lowercased()
+        let prefixLower = matchedPrefix.lowercased()
+        guard codeLower.hasPrefix(prefixLower) else { return false }
+        if let index = codeLower.firstIndex(of: Character(char.lowercased())) {
+            return codeLower.distance(from: codeLower.startIndex, to: index) < prefixLower.count
+        }
+        return false
+    }
+}
+
+// MARK: - Animated Border
+
+private struct FlowingBorder: View {
+    var active: Bool = true
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !active)) { context in
+            let time = context.date.timeIntervalSinceReferenceDate
+            let angle = Angle.degrees(time.truncatingRemainder(dividingBy: 3.0) / 3.0 * 360.0)
+
+            Capsule(style: .continuous)
+                .strokeBorder(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            Color(red: 0.30, green: 0.85, blue: 1.00),
+                            Color(red: 0.60, green: 0.40, blue: 1.00),
+                            Color(red: 1.00, green: 0.35, blue: 0.78),
+                            Color(red: 0.25, green: 0.95, blue: 0.78),
+                            Color(red: 0.30, green: 0.85, blue: 1.00)
+                        ]),
+                        center: .center,
+                        angle: angle
+                    ),
+                    lineWidth: active ? 1.4 : 0.6
+                )
+                .opacity(active ? 1.0 : 0.35)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Grid Lines Background
+
+private struct GridLinesOverlay: View {
+    let cellSize: CGFloat
+    let color: Color
+    let lineWidth: CGFloat
+
+    var body: some View {
+        Canvas { context, size in
+            let stroke = GraphicsContext.Shading.color(color)
+
+            var x: CGFloat = 0
+            while x <= size.width {
+                var path = Path()
+                path.move(to: CGPoint(x: x, y: 0))
+                path.addLine(to: CGPoint(x: x, y: size.height))
+                context.stroke(path, with: stroke, lineWidth: lineWidth)
+                x += cellSize
+            }
+
+            var y: CGFloat = 0
+            while y <= size.height {
+                var path = Path()
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: size.width, y: y))
+                context.stroke(path, with: stroke, lineWidth: lineWidth)
+                y += cellSize
+            }
+        }
+        .allowsHitTesting(false)
     }
 }

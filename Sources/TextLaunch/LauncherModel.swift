@@ -9,10 +9,20 @@ struct DisplayGroup: Identifiable {
     let isLetterIndex: Bool
 }
 
+enum HintInputResult {
+    case consumed
+    case launched(MacApplication)
+    case cancelled
+}
+
 final class LauncherModel: ObservableObject {
     @Published var applications: [MacApplication] = []
     @Published var searchText = ""
     @Published var focusRequest = 0
+
+    @Published var hintMode: Bool = false
+    @Published var hintBuffer: String = ""
+    @Published private(set) var hintCodes: [String: String] = [:]
 
     let settings: AppSettings
 
@@ -186,6 +196,50 @@ final class LauncherModel: ObservableObject {
 
     func requestSearchFocus() {
         focusRequest += 1
+    }
+
+    // MARK: - Hint Mode
+
+    func enterHintMode() {
+        regenerateHints()
+        hintBuffer = ""
+        hintMode = true
+    }
+
+    func exitHintMode() {
+        hintMode = false
+        hintBuffer = ""
+    }
+
+    func handleHintInput(_ character: Character) -> HintInputResult {
+        let key = String(character).lowercased()
+        let next = hintBuffer + key
+
+        let matches = hintCodes.filter { $0.value.hasPrefix(next) }
+        if matches.isEmpty {
+            exitHintMode()
+            return .cancelled
+        }
+
+        if matches.count == 1, let pair = matches.first, pair.value == next {
+            let path = pair.key
+            if let app = visibleApplications.first(where: { $0.url.path == path }) {
+                exitHintMode()
+                return .launched(app)
+            }
+            exitHintMode()
+            return .cancelled
+        }
+
+        hintBuffer = next
+        return .consumed
+    }
+
+    private func regenerateHints() {
+        let orderedPaths: [String] = displayGroups.flatMap { group in
+            group.applications.map { $0.url.path }
+        }
+        hintCodes = HintCoordinator.generateCodes(for: orderedPaths)
     }
 
     func open(_ application: MacApplication, completion: @escaping () -> Void = {}) {
