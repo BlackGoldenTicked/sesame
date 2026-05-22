@@ -21,6 +21,34 @@ chmod +x "$MACOS_DIR/$APP_NAME"
 BUILT_BUNDLE="$ROOT_DIR/.build/$CONFIGURATION/${APP_NAME}_${APP_NAME}.bundle"
 if [ -d "$BUILT_BUNDLE" ]; then
   cp -R "$BUILT_BUNDLE" "$RESOURCES_DIR/"
+  COPIED_BUNDLE="$RESOURCES_DIR/${APP_NAME}_${APP_NAME}.bundle"
+  # Bundle(url:) returns nil for a plain directory, which crashes Bundle.module
+  # at launch. Write a minimal Info.plist so the resource bundle is recognized.
+  if [ ! -f "$COPIED_BUNDLE/Info.plist" ]; then
+    cat > "$COPIED_BUNDLE/Info.plist" <<RESOURCE_PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.chaordex.sesame.resources</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>${APP_NAME}_${APP_NAME}</string>
+  <key>CFBundlePackageType</key>
+  <string>BNDL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+</dict>
+</plist>
+RESOURCE_PLIST
+  fi
+  xattr -dr com.apple.quarantine "$COPIED_BUNDLE" 2>/dev/null || true
 fi
 
 LOGO_SRC="$ROOT_DIR/Sources/$APP_NAME/Resources/logo.png"
@@ -69,5 +97,7 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+
+xattr -dr com.apple.quarantine "$APP_DIR" 2>/dev/null || true
 
 echo "$APP_DIR"
