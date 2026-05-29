@@ -72,52 +72,28 @@ struct LauncherView: View {
     }
 
     private var background: some View {
-        ZStack {
-            Color(red: 0.07, green: 0.07, blue: 0.085)
-
-            // Ambient color glows — subtle radial tints in three corners
-            let ambient = settings.colorTheme.ambientColors
-            RadialGradient(
-                colors: [
-                    (ambient.first ?? .blue).opacity(0.18),
-                    Color.clear
-                ],
-                center: UnitPoint(x: 0.12, y: 0.18),
-                startRadius: 0,
-                endRadius: 700
-            )
-            RadialGradient(
-                colors: [
-                    (ambient.count > 1 ? ambient[1] : .pink).opacity(0.13),
-                    Color.clear
-                ],
-                center: UnitPoint(x: 0.88, y: 0.82),
-                startRadius: 0,
-                endRadius: 700
-            )
-            RadialGradient(
-                colors: [
-                    (ambient.count > 2 ? ambient[2] : .purple).opacity(0.10),
-                    Color.clear
-                ],
-                center: UnitPoint(x: 0.78, y: 0.12),
-                startRadius: 0,
-                endRadius: 600
-            )
-
-            GridLinesOverlay(
-                cellSize: CGFloat(settings.gridCellSize),
-                color: Color.white.opacity(0.045),
-                lineWidth: 0.5
-            )
-            RadialGradient(
-                colors: [Color.clear, Color.black.opacity(0.30)],
-                center: .center,
-                startRadius: 260,
-                endRadius: 1200
-            )
-        }
+        // Cache the multi-layer background (4 RadialGradients + Canvas grid)
+        // into a single GPU-backed bitmap. Recomputes only when the inputs
+        // below change (ambient theme or grid cell size), so search-typing,
+        // hover, and scroll do not re-rasterize this layer.
+        StaticBackground(
+            ambient: settings.colorTheme.ambientColors,
+            gridCellSize: CGFloat(settings.gridCellSize)
+        )
+        .equatable()
         .ignoresSafeArea()
+        // Tap on any empty (non-tile / non-control) area mirrors the ESC key:
+        // exits hint mode if active, otherwise closes the launcher.
+        .contentShape(Rectangle())
+        .onTapGesture { handleBackgroundTap() }
+    }
+
+    private func handleBackgroundTap() {
+        if model.hintMode {
+            model.exitHintMode()
+        } else {
+            close()
+        }
     }
 
     // MARK: - Toolbar
@@ -155,6 +131,7 @@ struct LauncherView: View {
                 .tint(Color(white: 0.2))
                 .font(.system(size: 14, weight: .medium))
                 .disabled(model.hintMode)
+                .disableFocusRing()
 
             if !model.searchText.isEmpty {
                 Button {
@@ -169,7 +146,10 @@ struct LauncherView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(FrostedPillBackground(blobColors: settings.colorTheme.pillBlobColors))
+        .background(
+            FrostedPillBackground(blobColors: settings.colorTheme.pillBlobColors)
+                .equatable()
+        )
         .frame(width: 320)
         .opacity(model.hintMode ? 0.55 : 1)
         .animation(.easeInOut(duration: 0.18), value: model.hintMode)
@@ -239,6 +219,16 @@ struct LauncherView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            // Empty space between/around tiles falls through to the same
+            // background-tap behavior (exit hint mode or close launcher).
+            // Tile Buttons absorb their own taps first, so this only fires
+            // on truly empty regions.
+            .background(
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { handleBackgroundTap() }
+            )
         }
         .scrollContentBackground(.hidden)
     }
@@ -297,6 +287,9 @@ struct LauncherView: View {
                 .foregroundStyle(.white.opacity(0.55))
             Spacer()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture { handleBackgroundTap() }
     }
 
     private var hintHud: some View {
@@ -428,10 +421,17 @@ private struct HintBadge: View {
 
 // MARK: - Frosted Pill Background
 
-private struct FrostedPillBackground: View {
+private struct FrostedPillBackground: View, Equatable {
     let blobColors: [Color]
 
+    static func == (lhs: FrostedPillBackground, rhs: FrostedPillBackground) -> Bool {
+        lhs.blobColors == rhs.blobColors
+    }
+
     var body: some View {
+        // Compose the blurred blobs + gradient fill + stroke into a single
+        // rasterized layer so per-keystroke search-field re-renders don't
+        // re-blur three circles on the CPU.
         Capsule(style: .continuous)
             .fill(.white)
             .overlay(
@@ -462,6 +462,8 @@ private struct FrostedPillBackground: View {
                         lineWidth: 1
                     )
             )
+            .compositingGroup()
+            .drawingGroup(opaque: false)
             .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
             .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
     }
@@ -500,6 +502,104 @@ private struct FrostedPillBackground: View {
 private extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
+    }
+}
+
+// MARK: - Focus Ring Suppression
+//
+// macOS draws a white rectangular focus ring around focused TextFields
+// even when textFieldStyle(.plain) is applied. `focusEffectDisabled()`
+// removes it, but it's only available from macOS 14 — fall back to the
+// AppKit-level NSTextField.focusRingType for macOS 13.
+
+extension View {
+    @ViewBuilder
+    func disableFocusRing() -> some View {
+        if #available(macOS 14.0, *) {
+            self.focusEffectDisabled()
+        } else {
+            self.background(FocusRingRemover())
+        }
+    }
+}
+
+private struct FocusRingRemover: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            removeFocusRing(in: nsView.window?.contentView)
+        }
+    }
+
+    private func removeFocusRing(in view: NSView?) {
+        guard let view = view else { return }
+        if let field = view as? NSTextField {
+            field.focusRingType = .none
+        }
+        for sub in view.subviews {
+            removeFocusRing(in: sub)
+        }
+    }
+}
+
+// MARK: - Static Background (cached to GPU texture)
+
+private struct StaticBackground: View, Equatable {
+    let ambient: [Color]
+    let gridCellSize: CGFloat
+
+    static func == (lhs: StaticBackground, rhs: StaticBackground) -> Bool {
+        lhs.gridCellSize == rhs.gridCellSize && lhs.ambient == rhs.ambient
+    }
+
+    var body: some View {
+        ZStack {
+            Color(red: 0.07, green: 0.07, blue: 0.085)
+
+            RadialGradient(
+                colors: [
+                    (ambient.first ?? .blue).opacity(0.18),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.12, y: 0.18),
+                startRadius: 0,
+                endRadius: 700
+            )
+            RadialGradient(
+                colors: [
+                    (ambient.count > 1 ? ambient[1] : .pink).opacity(0.13),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.88, y: 0.82),
+                startRadius: 0,
+                endRadius: 700
+            )
+            RadialGradient(
+                colors: [
+                    (ambient.count > 2 ? ambient[2] : .purple).opacity(0.10),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.78, y: 0.12),
+                startRadius: 0,
+                endRadius: 600
+            )
+
+            GridLinesOverlay(
+                cellSize: gridCellSize,
+                color: Color.white.opacity(0.045),
+                lineWidth: 0.5
+            )
+
+            RadialGradient(
+                colors: [Color.clear, Color.black.opacity(0.30)],
+                center: .center,
+                startRadius: 260,
+                endRadius: 1200
+            )
+        }
+        .drawingGroup(opaque: true)
+        .allowsHitTesting(false)
     }
 }
 

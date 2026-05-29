@@ -88,7 +88,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configureMenu()
         configureStatusItem()
         observeLanguageChange()
-        model.reload()
+        // showLauncher() itself triggers reloadAsync(); avoid a synchronous
+        // disk scan on the main thread during launch.
+        model.reloadAsync()
         model.startWatching()
         showLauncher()
         installHotCornerMonitor()
@@ -115,7 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func applyAppIcon() {
         guard
-            let url = Bundle.module.url(forResource: "logo", withExtension: "png"),
+            let url = Bundle.appResources?.url(forResource: "logo", withExtension: "png"),
             let image = NSImage(contentsOf: url)
         else {
             return
@@ -137,7 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func reloadApplications() {
-        model.reload()
+        model.reloadAsync()
     }
 
     @objc private func openSettingsFromMenu() {
@@ -488,7 +490,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
             if
-                let iconURL = Bundle.module.url(forResource: "menubar", withExtension: "png"),
+                let iconURL = Bundle.appResources?.url(forResource: "menubar", withExtension: "png"),
                 let image = NSImage(contentsOf: iconURL)
             {
                 let target = NSSize(width: 18, height: 18)

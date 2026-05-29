@@ -24,9 +24,12 @@ final class LauncherModel: ObservableObject {
     @Published var hintBuffer: String = ""
     @Published private(set) var hintCodes: [String: String] = [:]
 
+    @Published private(set) var visibleApplications: [MacApplication] = []
+    @Published private(set) var filteredApplications: [MacApplication] = []
+    @Published private(set) var displayGroups: [DisplayGroup] = []
+
     let settings: AppSettings
 
-    private var cancellables: Set<AnyCancellable> = []
     private let scanQueue = DispatchQueue(label: "sesame.scan", qos: .userInitiated)
     private var watchSources: [DispatchSourceFileSystemObject] = []
     private var watchedFileDescriptors: [Int32] = []
@@ -34,40 +37,49 @@ final class LauncherModel: ObservableObject {
 
     init(settings: AppSettings = AppSettings()) {
         self.settings = settings
-        settings.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
+        bindDerivedState()
     }
 
     deinit {
         stopWatching()
     }
 
-    var visibleApplications: [MacApplication] {
-        applications.filter { !settings.hiddenAppPaths.contains($0.url.path) }
-    }
+    private func bindDerivedState() {
+        // visibleApplications = applications − hiddenAppPaths
+        Publishers.CombineLatest($applications, settings.$hiddenAppPaths)
+            .map { apps, hidden -> [MacApplication] in
+                guard !hidden.isEmpty else { return apps }
+                return apps.filter { !hidden.contains($0.url.path) }
+            }
+            .removeDuplicates()
+            .assign(to: &$visibleApplications)
 
-    var filteredApplications: [MacApplication] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let base = visibleApplications
-        guard !query.isEmpty else {
-            return base
-        }
+        // filteredApplications = visibleApplications filtered by searchText
+        Publishers.CombineLatest($visibleApplications, $searchText)
+            .map { apps, raw -> [MacApplication] in
+                let query = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !query.isEmpty else { return apps }
+                return apps.filter { $0.name.localizedCaseInsensitiveContains(query) }
+            }
+            .removeDuplicates()
+            .assign(to: &$filteredApplications)
 
-        return base.filter { application in
-            application.name.localizedCaseInsensitiveContains(query)
+        // displayGroups recomputes only when its real inputs change.
+        Publishers.CombineLatest3(
+            $filteredApplications,
+            settings.$sortMode.removeDuplicates(),
+            settings.$customGroups.removeDuplicates()
+        )
+        .map { [weak self] apps, mode, customs -> [DisplayGroup] in
+            guard let self else { return [] }
+            switch mode {
+            case .alphabetical:
+                return self.alphabeticalGroups(from: apps)
+            case .customGroups:
+                return self.customGroupSections(from: apps, customGroups: customs)
+            }
         }
-    }
-
-    var displayGroups: [DisplayGroup] {
-        switch settings.sortMode {
-        case .alphabetical:
-            return alphabeticalGroups(from: filteredApplications)
-        case .customGroups:
-            return customGroupSections(from: filteredApplications)
-        }
+        .assign(to: &$displayGroups)
     }
 
     private func alphabeticalGroups(from apps: [MacApplication]) -> [DisplayGroup] {
@@ -94,12 +106,12 @@ final class LauncherModel: ObservableObject {
             }
     }
 
-    private func customGroupSections(from apps: [MacApplication]) -> [DisplayGroup] {
+    private func customGroupSections(from apps: [MacApplication], customGroups: [CustomGroup]) -> [DisplayGroup] {
         let appsByPath = Dictionary(uniqueKeysWithValues: apps.map { ($0.url.path, $0) })
         var assignedPaths: Set<String> = []
         var groups: [DisplayGroup] = []
 
-        for group in settings.customGroups {
+        for group in customGroups {
             let members = group.appPaths.compactMap { appsByPath[$0] }
             if members.isEmpty { continue }
             assignedPaths.formUnion(members.map { $0.url.path })

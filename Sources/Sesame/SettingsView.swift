@@ -114,7 +114,7 @@ struct SettingsView: View {
     private func appIcon(size: CGFloat) -> some View {
         Group {
             if
-                let url = Bundle.module.url(forResource: "logo", withExtension: "png"),
+                let url = Bundle.appResources?.url(forResource: "logo", withExtension: "png"),
                 let image = NSImage(contentsOf: url)
             {
                 Image(nsImage: image)
@@ -603,7 +603,7 @@ private struct AboutPage: View {
     private var aboutIcon: some View {
         Group {
             if
-                let url = Bundle.module.url(forResource: "logo", withExtension: "png"),
+                let url = Bundle.appResources?.url(forResource: "logo", withExtension: "png"),
                 let image = NSImage(contentsOf: url)
             {
                 Image(nsImage: image)
