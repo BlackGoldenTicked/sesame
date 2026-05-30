@@ -254,6 +254,33 @@ final class LauncherModel: ObservableObject {
         hintCodes = HintCoordinator.generateCodes(for: orderedPaths)
     }
 
+    // MARK: - App Management
+
+    /// Hides the app from the launcher after the user confirms. The hidden set
+    /// drives `visibleApplications`, so the grid updates automatically; the app
+    /// can be restored from Settings ▸ Hidden.
+    func hide(_ application: MacApplication) {
+        AppActions.confirmHide(application, language: settings.language) { [weak self] confirmed in
+            guard confirmed, let self else { return }
+            self.settings.setHidden(true, for: application)
+        }
+    }
+
+    /// Moves the app bundle to the Trash after the user confirms. System apps
+    /// are not removable and are guarded against here as well as in the UI.
+    func uninstall(_ application: MacApplication) {
+        guard AppActions.isRemovable(application) else { return }
+        AppActions.confirmUninstall(application, language: settings.language) { [weak self] confirmed in
+            guard confirmed, let self else { return }
+            do {
+                try AppActions.moveToTrash(application)
+                self.reloadAsync()
+            } catch {
+                AppActions.presentError(error, for: application, language: self.settings.language)
+            }
+        }
+    }
+
     func open(_ application: MacApplication, completion: @escaping () -> Void = {}) {
         let configuration = NSWorkspace.OpenConfiguration()
         NSWorkspace.shared.openApplication(at: application.url, configuration: configuration) { _, _ in

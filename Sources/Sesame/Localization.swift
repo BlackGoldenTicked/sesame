@@ -31,6 +31,9 @@ enum L {
     case font, fontFamily, systemDefault, preview, applicationFont, fontFootnote
     case menuShowApp, menuShowApplications, menuReload, menuSettings, menuQuit
     case menuTriggerCorner, cornerOff, cornerTopLeft, cornerTopRight, cornerBottomLeft, cornerBottomRight
+    case ctxHide, ctxUninstall
+    case confirmHideTitle, confirmHideBody, confirmUninstallTitle, confirmUninstallBody
+    case actionHide, actionMoveToTrash, actionCancel, okButton, uninstallFailedTitle
 
     func string(_ lang: AppLanguage) -> String {
         switch lang {
@@ -112,7 +115,18 @@ enum L {
         .cornerTopLeft: "Top Left",
         .cornerTopRight: "Top Right",
         .cornerBottomLeft: "Bottom Left",
-        .cornerBottomRight: "Bottom Right"
+        .cornerBottomRight: "Bottom Right",
+        .ctxHide: "Hide from Launcher",
+        .ctxUninstall: "Move to Trash…",
+        .confirmHideTitle: "Hide \u{201C}%@\u{201D}?",
+        .confirmHideBody: "It will be removed from the launcher. You can restore it anytime from Settings \u{25B8} Hidden.",
+        .confirmUninstallTitle: "Move \u{201C}%@\u{201D} to the Trash?",
+        .confirmUninstallBody: "The application will be moved to the Trash. You can restore it from the Trash until you empty it.",
+        .actionHide: "Hide",
+        .actionMoveToTrash: "Move to Trash",
+        .actionCancel: "Cancel",
+        .okButton: "OK",
+        .uninstallFailedTitle: "Couldn\u{2019}t move \u{201C}%@\u{201D} to the Trash"
     ]
 
     private static let chinese: [L: String] = [
@@ -188,6 +202,17 @@ enum L {
         .cornerTopLeft: "左上角",
         .cornerTopRight: "右上角",
         .cornerBottomLeft: "左下角",
-        .cornerBottomRight: "右下角"
+        .cornerBottomRight: "右下角",
+        .ctxHide: "从启动器隐藏",
+        .ctxUninstall: "移到废纸篓…",
+        .confirmHideTitle: "隐藏「%@」？",
+        .confirmHideBody: "它将从启动器中移除。你可以随时在「设置 \u{25B8} 隐藏」中恢复。",
+        .confirmUninstallTitle: "将「%@」移到废纸篓？",
+        .confirmUninstallBody: "该应用将被移到废纸篓。在清空废纸篓之前，你都可以恢复它。",
+        .actionHide: "隐藏",
+        .actionMoveToTrash: "移到废纸篓",
+        .actionCancel: "取消",
+        .okButton: "好",
+        .uninstallFailedTitle: "无法将「%@」移到废纸篓"
     ]
 }

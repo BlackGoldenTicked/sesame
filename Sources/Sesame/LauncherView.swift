@@ -206,8 +206,12 @@ struct LauncherView: View {
                                     application: app,
                                     font: tileFont,
                                     metrics: metrics,
+                                    language: settings.language,
+                                    canUninstall: AppActions.isRemovable(app),
                                     hintCode: model.hintMode ? model.hintCodes[app.url.path] : nil,
-                                    hintMatchedPrefix: model.hintMode ? model.hintBuffer : ""
+                                    hintMatchedPrefix: model.hintMode ? model.hintBuffer : "",
+                                    onHide: { model.hide(app) },
+                                    onUninstall: { model.uninstall(app) }
                                 ) {
                                     close()
                                     model.open(app)
@@ -322,8 +326,12 @@ struct LaunchpadTile: View {
     let application: MacApplication
     let font: Font
     let metrics: TileMetrics
+    var language: AppLanguage = .english
+    var canUninstall: Bool = true
     var hintCode: String? = nil
     var hintMatchedPrefix: String = ""
+    var onHide: () -> Void = {}
+    var onUninstall: () -> Void = {}
     let action: () -> Void
 
     @State private var hovering = false
@@ -369,6 +377,17 @@ struct LaunchpadTile: View {
                 .onChanged { _ in pressing = true }
                 .onEnded { _ in pressing = false }
         )
+        .contextMenu {
+            Button(action: onHide) {
+                Label(L.ctxHide.string(language), systemImage: "eye.slash")
+            }
+            if canUninstall {
+                Divider()
+                Button(role: .destructive, action: onUninstall) {
+                    Label(L.ctxUninstall.string(language), systemImage: "trash")
+                }
+            }
+        }
     }
 }
 
